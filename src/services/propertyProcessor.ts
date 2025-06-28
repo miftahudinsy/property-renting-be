@@ -22,6 +22,24 @@ export interface ProcessedRoom {
   peak_season_rates: any[];
 }
 
+export interface PropertyDetail {
+  property_id: number;
+  name: string;
+  description: string;
+  location: string;
+  category: string | null;
+  city: {
+    name: string;
+    type: string;
+  } | null;
+  property_pictures: Array<{
+    id: number;
+    file_path: string;
+    is_main: boolean;
+  }>;
+  available_rooms: ProcessedRoom[];
+}
+
 export const processRoomsAvailability = (property: any): ProcessedRoom[] => {
   const availableRooms: ProcessedRoom[] = [];
 
@@ -129,5 +147,25 @@ export const applyPagination = (
       has_next_page: page < totalPages,
       has_prev_page: page > 1,
     },
+  };
+};
+
+export const processPropertyDetail = (property: any): PropertyDetail => {
+  const availableRooms = processRoomsAvailability(property);
+
+  return {
+    property_id: property.id,
+    name: property.name,
+    description: property.description,
+    location: property.location,
+    category: property.property_categories?.name || null,
+    city: property.cities
+      ? {
+          name: property.cities.name,
+          type: property.cities.type,
+        }
+      : null,
+    property_pictures: property.property_pictures,
+    available_rooms: availableRooms,
   };
 };

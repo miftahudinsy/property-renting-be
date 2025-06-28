@@ -2,10 +2,12 @@ import { NextFunction, Request, Response } from "express";
 import {
   validateSearchParams,
   validatePagination,
+  validateDetailParams,
 } from "../services/propertyValidation";
 import {
   buildWhereClause,
   getAvailableProperties,
+  getPropertyDetail,
 } from "../services/propertyQuery";
 import {
   processRoomsAvailability,
@@ -13,11 +15,15 @@ import {
   sortProperties,
   applyPagination,
   ProcessedProperty,
+  processPropertyDetail,
 } from "../services/propertyProcessor";
 import {
   sendSuccessResponse,
   sendEmptyResponse,
   sendErrorResponse,
+  sendPropertyDetailResponse,
+  sendPropertyNotFoundResponse,
+  sendNoAvailableRoomsResponse,
 } from "../services/responseHelper";
 
 export const searchProperties = async (
@@ -96,6 +102,41 @@ export const searchProperties = async (
       categories,
       paginatedResult.pagination
     );
+  } catch (error) {
+    sendErrorResponse(res, error);
+  }
+};
+
+export const getPropertyDetailById = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    // Validasi input parameters
+    const validatedParams = validateDetailParams(req.query, res);
+    if (!validatedParams) return;
+
+    // Query property detail
+    const property = await getPropertyDetail(validatedParams);
+
+    // Cek apakah property ditemukan
+    if (!property) {
+      sendPropertyNotFoundResponse(res);
+      return;
+    }
+
+    // Process property detail
+    const processedProperty = processPropertyDetail(property);
+
+    // Cek apakah ada room yang tersedia
+    if (processedProperty.available_rooms.length === 0) {
+      sendNoAvailableRoomsResponse(res);
+      return;
+    }
+
+    // Send success response
+    sendPropertyDetailResponse(res, processedProperty);
   } catch (error) {
     sendErrorResponse(res, error);
   }

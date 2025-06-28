@@ -1,5 +1,8 @@
 import { PrismaClient } from "../../generated/prisma";
-import { ValidatedSearchParams } from "./propertyValidation";
+import {
+  ValidatedSearchParams,
+  ValidatedDetailParams,
+} from "./propertyValidation";
 
 const prisma = new PrismaClient();
 
@@ -75,6 +78,82 @@ export const getAvailableProperties = async (
         select: {
           file_path: true,
         },
+      },
+      rooms: {
+        where: {
+          max_guests: {
+            gte: guestCount,
+          },
+          quantity: {
+            gt: 0,
+          },
+        },
+        include: {
+          bookings: {
+            where: {
+              status_id: {
+                not: 1, // 1 = Canceled
+              },
+              check_in: {
+                lt: checkOutDate,
+              },
+              check_out: {
+                gt: checkInDate,
+              },
+            },
+          },
+          room_unavailabilities: {
+            where: {
+              start_date: {
+                lt: checkOutDate,
+              },
+              end_date: {
+                gt: checkInDate,
+              },
+            },
+          },
+          peak_season_rates: {
+            where: {
+              start_date: {
+                lte: checkInDate,
+              },
+              end_date: {
+                gte: checkOutDate,
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+};
+
+export const getPropertyDetail = async (params: ValidatedDetailParams) => {
+  const { propertyId, guestCount, checkInDate, checkOutDate } = params;
+
+  return await prisma.properties.findUnique({
+    where: {
+      id: propertyId,
+    },
+    include: {
+      property_categories: {
+        select: {
+          name: true,
+        },
+      },
+      cities: {
+        select: {
+          name: true,
+          type: true,
+        },
+      },
+      property_pictures: {
+        select: {
+          id: true,
+          file_path: true,
+          is_main: true,
+        },
+        orderBy: [{ is_main: "desc" }, { id: "asc" }],
       },
       rooms: {
         where: {
