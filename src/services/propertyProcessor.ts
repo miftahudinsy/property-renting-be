@@ -55,7 +55,7 @@ export const processRoomsAvailability = (property: any): ProcessedRoom[] => {
       ? 0
       : room.quantity - bookedRoomsCount;
 
-    if (availableQuantity > 0) {
+    if (availableQuantity >= 0) {
       // Hitung harga dengan peak season rate jika ada
       let finalPrice = room.price;
 

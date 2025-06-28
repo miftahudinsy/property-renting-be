@@ -114,12 +114,10 @@ export const getAvailableProperties = async (
           },
           peak_season_rates: {
             where: {
-              start_date: {
-                lte: checkInDate,
-              },
-              end_date: {
-                gte: checkOutDate,
-              },
+              AND: [
+                { start_date: { lte: checkOutDate } },
+                { end_date: { gte: checkInDate } },
+              ],
             },
           },
         },
@@ -190,12 +188,10 @@ export const getPropertyDetail = async (params: ValidatedDetailParams) => {
           },
           peak_season_rates: {
             where: {
-              start_date: {
-                lte: checkInDate,
-              },
-              end_date: {
-                gte: checkOutDate,
-              },
+              AND: [
+                { start_date: { lte: checkOutDate } },
+                { end_date: { gte: checkInDate } },
+              ],
             },
           },
         },
