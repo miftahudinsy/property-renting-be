@@ -3,11 +3,13 @@ import {
   validateSearchParams,
   validatePagination,
   validateDetailParams,
+  validateCalendarParams,
 } from "../services/propertyValidation";
 import {
   buildWhereClause,
   getAvailableProperties,
   getPropertyDetail,
+  getPropertyForCalendar,
 } from "../services/propertyQuery";
 import {
   processRoomsAvailability,
@@ -16,6 +18,7 @@ import {
   applyPagination,
   ProcessedProperty,
   processPropertyDetail,
+  processCalendarData,
 } from "../services/propertyProcessor";
 import {
   sendSuccessResponse,
@@ -24,6 +27,8 @@ import {
   sendPropertyDetailResponse,
   sendPropertyNotFoundResponse,
   sendNoAvailableRoomsResponse,
+  sendCalendarResponse,
+  sendCalendarNotFoundResponse,
 } from "../services/responseHelper";
 
 export const searchProperties = async (
@@ -137,6 +142,37 @@ export const getPropertyDetailById = async (
 
     // Send success response
     sendPropertyDetailResponse(res, processedProperty);
+  } catch (error) {
+    sendErrorResponse(res, error);
+  }
+};
+
+export const getPropertyCalendar = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    // Validasi input parameters
+    const validatedParams = validateCalendarParams(req.query, req.params, res);
+    if (!validatedParams) return;
+
+    const { propertyId, year, month } = validatedParams;
+
+    // Query property dengan rooms untuk calendar
+    const property = await getPropertyForCalendar(propertyId, year, month);
+
+    // Cek apakah property ditemukan
+    if (!property) {
+      sendCalendarNotFoundResponse(res);
+      return;
+    }
+
+    // Process calendar data
+    const calendarData = processCalendarData(property, year, month, propertyId);
+
+    // Send success response
+    sendCalendarResponse(res, calendarData);
   } catch (error) {
     sendErrorResponse(res, error);
   }

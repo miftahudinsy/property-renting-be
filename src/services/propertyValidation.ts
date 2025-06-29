@@ -38,6 +38,12 @@ export interface ValidatedDetailParams {
   guestCount: number;
 }
 
+export interface ValidatedCalendarParams {
+  propertyId: number;
+  year: number;
+  month: number;
+}
+
 export const validateSearchParams = (
   params: SearchParams,
   res: Response
@@ -218,5 +224,50 @@ export const validateDetailParams = (
     checkInDate,
     checkOutDate,
     guestCount,
+  };
+};
+
+export const validateCalendarParams = (
+  query: any,
+  params: any,
+  res: Response
+): ValidatedCalendarParams | null => {
+  const { propertyId } = params;
+  const { year, month } = query;
+
+  // Validate propertyId
+  const parsedPropertyId = parseInt(propertyId);
+  if (isNaN(parsedPropertyId) || parsedPropertyId <= 0) {
+    res.status(400).json({
+      status: "error",
+      message: "Property ID harus berupa angka positif",
+    });
+    return null;
+  }
+
+  // Validate year
+  const parsedYear = parseInt(year);
+  if (isNaN(parsedYear) || parsedYear < 2020 || parsedYear > 2030) {
+    res.status(400).json({
+      status: "error",
+      message: "Year harus berupa angka antara 2020-2030",
+    });
+    return null;
+  }
+
+  // Validate month
+  const parsedMonth = parseInt(month);
+  if (isNaN(parsedMonth) || parsedMonth < 1 || parsedMonth > 12) {
+    res.status(400).json({
+      status: "error",
+      message: "Month harus berupa angka antara 1-12",
+    });
+    return null;
+  }
+
+  return {
+    propertyId: parsedPropertyId,
+    year: parsedYear,
+    month: parsedMonth,
   };
 };

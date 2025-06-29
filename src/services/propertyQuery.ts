@@ -199,3 +199,131 @@ export const getPropertyDetail = async (params: ValidatedDetailParams) => {
     },
   });
 };
+
+export const getPropertyForCalendar = async (
+  propertyId: number,
+  year: number,
+  month: number
+) => {
+  // Buat start dan end date untuk month
+  const startDate = new Date(year, month - 1, 1); // month-1 karena JS month 0-indexed
+  const endDate = new Date(year, month, 0, 23, 59, 59); // Last day of month
+
+  return await prisma.properties.findUnique({
+    where: {
+      id: propertyId,
+    },
+    select: {
+      id: true,
+      name: true,
+      rooms: {
+        where: {
+          quantity: {
+            gt: 0,
+          },
+        },
+        include: {
+          bookings: {
+            where: {
+              status_id: {
+                not: 1, // Exclude canceled bookings
+              },
+              OR: [
+                {
+                  check_in: {
+                    gte: startDate,
+                    lte: endDate,
+                  },
+                },
+                {
+                  check_out: {
+                    gte: startDate,
+                    lte: endDate,
+                  },
+                },
+                {
+                  AND: [
+                    {
+                      check_in: {
+                        lte: startDate,
+                      },
+                    },
+                    {
+                      check_out: {
+                        gte: endDate,
+                      },
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+          room_unavailabilities: {
+            where: {
+              OR: [
+                {
+                  start_date: {
+                    gte: startDate,
+                    lte: endDate,
+                  },
+                },
+                {
+                  end_date: {
+                    gte: startDate,
+                    lte: endDate,
+                  },
+                },
+                {
+                  AND: [
+                    {
+                      start_date: {
+                        lte: startDate,
+                      },
+                    },
+                    {
+                      end_date: {
+                        gte: endDate,
+                      },
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+          peak_season_rates: {
+            where: {
+              OR: [
+                {
+                  start_date: {
+                    gte: startDate,
+                    lte: endDate,
+                  },
+                },
+                {
+                  end_date: {
+                    gte: startDate,
+                    lte: endDate,
+                  },
+                },
+                {
+                  AND: [
+                    {
+                      start_date: {
+                        lte: startDate,
+                      },
+                    },
+                    {
+                      end_date: {
+                        gte: endDate,
+                      },
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        },
+      },
+    },
+  });
+};

@@ -66,3 +66,17 @@ export const sendNoAvailableRoomsResponse = (res: Response) => {
     data: null,
   });
 };
+
+export const sendCalendarResponse = (res: Response, calendarData: any) => {
+  res.status(200).json({
+    status: "success",
+    data: calendarData,
+  });
+};
+
+export const sendCalendarNotFoundResponse = (res: Response) => {
+  res.status(404).json({
+    status: "error",
+    message: "Property tidak ditemukan",
+  });
+};
