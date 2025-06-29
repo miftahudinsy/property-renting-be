@@ -1,26 +1,10 @@
-export interface ProcessedProperty {
-  property_id: number;
-  name: string;
-  location: string;
-  category: string | null;
-  city_id: number;
-  property_pictures: string | null;
-  price: number;
-  available_rooms: number;
-}
-
-export interface ProcessedRoom {
-  id: number;
-  name: string;
-  price: number;
-  max_guests: number;
-  quantity: number;
-  available_quantity: number;
-  final_price: number;
-  bookings: any[];
-  room_unavailabilities: any[];
-  peak_season_rates: any[];
-}
+import {
+  ProcessedProperty,
+  ProcessedRoom,
+  PropertyDetail,
+  CalendarDay,
+  CalendarData,
+} from "./propertyInterfaces";
 
 export const processRoomsAvailability = (property: any): ProcessedRoom[] => {
   const availableRooms: ProcessedRoom[] = [];
@@ -37,7 +21,7 @@ export const processRoomsAvailability = (property: any): ProcessedRoom[] => {
       ? 0
       : room.quantity - bookedRoomsCount;
 
-    if (availableQuantity > 0) {
+    if (availableQuantity >= 0) {
       // Hitung harga dengan peak season rate jika ada
       let finalPrice = room.price;
 
@@ -130,4 +114,167 @@ export const applyPagination = (
       has_prev_page: page > 1,
     },
   };
+};
+
+export const processPropertyDetail = (property: any): PropertyDetail => {
+  const availableRooms = processRoomsAvailability(property);
+
+  return {
+    property_id: property.id,
+    name: property.name,
+    description: property.description,
+    location: property.location,
+    category: property.property_categories?.name || null,
+    city: property.cities
+      ? {
+          name: property.cities.name,
+          type: property.cities.type,
+        }
+      : null,
+    property_pictures: property.property_pictures,
+    available_rooms: availableRooms,
+  };
+};
+
+export const processCalendarData = (
+  property: any,
+  year: number,
+  month: number,
+  propertyId: number
+): CalendarData => {
+  const calendar: CalendarDay[] = [];
+  const daysInMonth = new Date(year, month, 0).getDate();
+
+  const dayNames = [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+  ];
+
+  // Process each day in the month
+  for (let day = 1; day <= daysInMonth; day++) {
+    const currentDate = new Date(year, month - 1, day);
+    // Use local date formatting to avoid timezone conversion issues
+    const dateString = `${year}-${month.toString().padStart(2, "0")}-${day
+      .toString()
+      .padStart(2, "0")}`;
+    const dayOfWeek = dayNames[currentDate.getDay()];
+
+    // Check availability and calculate min price for this date
+    const availableRooms: any[] = [];
+
+    for (const room of property.rooms) {
+      // Check if room is booked on this date
+      const isBooked = room.bookings.some((booking: any) => {
+        const checkIn = new Date(booking.check_in);
+        const checkOut = new Date(booking.check_out);
+        return currentDate >= checkIn && currentDate < checkOut;
+      });
+
+      // Check if room is unavailable on this date
+      const isUnavailable = room.room_unavailabilities.some((unavail: any) => {
+        // Create new date objects and normalize to midnight for proper comparison
+        const startDate = new Date(unavail.start_date);
+        const endDate = new Date(unavail.end_date);
+        const checkDate = new Date(currentDate);
+
+        // Set time to 00:00:00 for accurate date-only comparison
+        startDate.setHours(0, 0, 0, 0);
+        endDate.setHours(0, 0, 0, 0);
+        checkDate.setHours(0, 0, 0, 0);
+
+        return checkDate >= startDate && checkDate <= endDate;
+      });
+
+      // Calculate booked rooms count for this date
+      const bookedRoomsCount = room.bookings.filter((booking: any) => {
+        const checkIn = new Date(booking.check_in);
+        const checkOut = new Date(booking.check_out);
+        return currentDate >= checkIn && currentDate < checkOut;
+      }).length;
+
+      // Calculate available quantity
+      const availableQuantity = isUnavailable
+        ? 0
+        : room.quantity - bookedRoomsCount;
+
+      if (availableQuantity > 0) {
+        // Calculate price with peak season rate if applicable
+        let finalPrice = room.price;
+
+        const applicablePeakRate = room.peak_season_rates.find((rate: any) => {
+          const startDate = new Date(rate.start_date);
+          const endDate = new Date(rate.end_date);
+          return currentDate >= startDate && currentDate <= endDate;
+        });
+
+        if (applicablePeakRate) {
+          if (applicablePeakRate.type === "percentage") {
+            finalPrice =
+              room.price + (room.price * applicablePeakRate.value) / 100;
+          } else if (applicablePeakRate.type === "fixed") {
+            finalPrice = room.price + applicablePeakRate.value;
+          }
+        }
+
+        availableRooms.push({
+          ...room,
+          available_quantity: availableQuantity,
+          final_price: finalPrice,
+        });
+      }
+    }
+
+    // Determine availability and min price
+    const isAvailable = availableRooms.length > 0;
+    const minPrice = isAvailable
+      ? Math.min(...availableRooms.map((room) => room.final_price))
+      : null;
+    const availableRoomsCount = availableRooms.reduce(
+      (total, room) => total + room.available_quantity,
+      0
+    );
+
+    calendar.push({
+      date: dateString,
+      day_of_week: dayOfWeek,
+      is_available: isAvailable,
+      min_price: minPrice,
+      available_rooms_count: availableRoomsCount,
+    });
+  }
+
+  // Calculate pagination info
+  const prevMonth = month === 1 ? 12 : month - 1;
+  const prevYear = month === 1 ? year - 1 : year;
+  const nextMonth = month === 12 ? 1 : month + 1;
+  const nextYear = month === 12 ? year + 1 : year;
+
+  return {
+    property_id: property.id,
+    property_name: property.name,
+    year,
+    month,
+    calendar,
+    pagination: {
+      current_month: month,
+      current_year: year,
+      has_prev_month: true, // You can add logic to limit this if needed
+      has_next_month: true, // You can add logic to limit this if needed
+      prev_month_url: `/api/properties/${propertyId}/calendar?year=${prevYear}&month=${prevMonth}`,
+      next_month_url: `/api/properties/${propertyId}/calendar?year=${nextYear}&month=${nextMonth}`,
+    },
+  };
+};
+
+export type {
+  ProcessedProperty,
+  ProcessedRoom,
+  PropertyDetail,
+  CalendarDay,
+  CalendarData,
 };

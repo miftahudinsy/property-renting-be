@@ -12,6 +12,13 @@ interface SearchParams {
   sort_order?: string;
 }
 
+interface DetailParams {
+  property_id?: string;
+  check_in?: string;
+  check_out?: string;
+  guests?: string;
+}
+
 export interface ValidatedSearchParams {
   cityId: number;
   checkInDate: Date;
@@ -22,6 +29,19 @@ export interface ValidatedSearchParams {
   categoryName?: string;
   sortBy?: string;
   sortOrder?: string;
+}
+
+export interface ValidatedDetailParams {
+  propertyId: number;
+  checkInDate: Date;
+  checkOutDate: Date;
+  guestCount: number;
+}
+
+export interface ValidatedCalendarParams {
+  propertyId: number;
+  year: number;
+  month: number;
 }
 
 export const validateSearchParams = (
@@ -131,4 +151,123 @@ export const validatePagination = (
     return false;
   }
   return true;
+};
+
+export const validateDetailParams = (
+  params: DetailParams,
+  res: Response
+): ValidatedDetailParams | null => {
+  const { property_id, check_in, check_out, guests } = params;
+
+  // Validasi input wajib
+  if (!property_id || !check_in || !check_out || !guests) {
+    res.status(400).json({
+      success: false,
+      message: "property_id, check_in, check_out, dan guests harus diisi",
+    });
+    return null;
+  }
+
+  const propertyId = parseInt(property_id as string);
+  const guestCount = parseInt(guests as string);
+  const checkInDate = new Date(check_in as string);
+  const checkOutDate = new Date(check_out as string);
+
+  // Validasi property_id adalah number yang valid
+  if (isNaN(propertyId) || propertyId <= 0) {
+    res.status(400).json({
+      success: false,
+      message: "property_id harus berupa angka yang valid",
+    });
+    return null;
+  }
+
+  // Validasi guests adalah number yang valid
+  if (isNaN(guestCount) || guestCount <= 0) {
+    res.status(400).json({
+      success: false,
+      message: "guests harus berupa angka yang valid",
+    });
+    return null;
+  }
+
+  // Validasi tanggal
+  if (isNaN(checkInDate.getTime()) || isNaN(checkOutDate.getTime())) {
+    res.status(400).json({
+      success: false,
+      message: "Format tanggal tidak valid",
+    });
+    return null;
+  }
+
+  if (checkInDate >= checkOutDate) {
+    res.status(400).json({
+      success: false,
+      message: "Tanggal check_in harus sebelum check_out",
+    });
+    return null;
+  }
+
+  // Validasi tanggal tidak boleh di masa lalu
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  if (checkInDate < today) {
+    res.status(400).json({
+      success: false,
+      message: "Tanggal check_in tidak boleh di masa lalu",
+    });
+    return null;
+  }
+
+  return {
+    propertyId,
+    checkInDate,
+    checkOutDate,
+    guestCount,
+  };
+};
+
+export const validateCalendarParams = (
+  query: any,
+  params: any,
+  res: Response
+): ValidatedCalendarParams | null => {
+  const { propertyId } = params;
+  const { year, month } = query;
+
+  // Validate propertyId
+  const parsedPropertyId = parseInt(propertyId);
+  if (isNaN(parsedPropertyId) || parsedPropertyId <= 0) {
+    res.status(400).json({
+      status: "error",
+      message: "Property ID harus berupa angka positif",
+    });
+    return null;
+  }
+
+  // Validate year
+  const parsedYear = parseInt(year);
+  if (isNaN(parsedYear) || parsedYear < 2020 || parsedYear > 2030) {
+    res.status(400).json({
+      status: "error",
+      message: "Year harus berupa angka antara 2020-2030",
+    });
+    return null;
+  }
+
+  // Validate month
+  const parsedMonth = parseInt(month);
+  if (isNaN(parsedMonth) || parsedMonth < 1 || parsedMonth > 12) {
+    res.status(400).json({
+      status: "error",
+      message: "Month harus berupa angka antara 1-12",
+    });
+    return null;
+  }
+
+  return {
+    propertyId: parsedPropertyId,
+    year: parsedYear,
+    month: parsedMonth,
+  };
 };

@@ -1,8 +1,14 @@
 import { Router } from "express";
-import { searchProperties } from "../controllers/propertyController";
+import {
+  searchProperties,
+  getPropertyDetailById,
+  getPropertyCalendar,
+} from "../controllers/propertyController";
 
 const router = Router();
 
 router.get("/search", searchProperties);
+router.get("/detail", getPropertyDetailById);
+router.get("/:propertyId/calendar", getPropertyCalendar);
 
 export default router;

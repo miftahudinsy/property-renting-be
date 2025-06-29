@@ -2,10 +2,14 @@ import { NextFunction, Request, Response } from "express";
 import {
   validateSearchParams,
   validatePagination,
+  validateDetailParams,
+  validateCalendarParams,
 } from "../services/propertyValidation";
 import {
   buildWhereClause,
   getAvailableProperties,
+  getPropertyDetail,
+  getPropertyForCalendar,
 } from "../services/propertyQuery";
 import {
   processRoomsAvailability,
@@ -13,11 +17,18 @@ import {
   sortProperties,
   applyPagination,
   ProcessedProperty,
+  processPropertyDetail,
+  processCalendarData,
 } from "../services/propertyProcessor";
 import {
   sendSuccessResponse,
   sendEmptyResponse,
   sendErrorResponse,
+  sendPropertyDetailResponse,
+  sendPropertyNotFoundResponse,
+  sendNoAvailableRoomsResponse,
+  sendCalendarResponse,
+  sendCalendarNotFoundResponse,
 } from "../services/responseHelper";
 
 export const searchProperties = async (
@@ -96,6 +107,72 @@ export const searchProperties = async (
       categories,
       paginatedResult.pagination
     );
+  } catch (error) {
+    sendErrorResponse(res, error);
+  }
+};
+
+export const getPropertyDetailById = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    // Validasi input parameters
+    const validatedParams = validateDetailParams(req.query, res);
+    if (!validatedParams) return;
+
+    // Query property detail
+    const property = await getPropertyDetail(validatedParams);
+
+    // Cek apakah property ditemukan
+    if (!property) {
+      sendPropertyNotFoundResponse(res);
+      return;
+    }
+
+    // Process property detail
+    const processedProperty = processPropertyDetail(property);
+
+    // Cek apakah ada room yang tersedia
+    if (processedProperty.available_rooms.length === 0) {
+      sendNoAvailableRoomsResponse(res);
+      return;
+    }
+
+    // Send success response
+    sendPropertyDetailResponse(res, processedProperty);
+  } catch (error) {
+    sendErrorResponse(res, error);
+  }
+};
+
+export const getPropertyCalendar = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    // Validasi input parameters
+    const validatedParams = validateCalendarParams(req.query, req.params, res);
+    if (!validatedParams) return;
+
+    const { propertyId, year, month } = validatedParams;
+
+    // Query property dengan rooms untuk calendar
+    const property = await getPropertyForCalendar(propertyId, year, month);
+
+    // Cek apakah property ditemukan
+    if (!property) {
+      sendCalendarNotFoundResponse(res);
+      return;
+    }
+
+    // Process calendar data
+    const calendarData = processCalendarData(property, year, month, propertyId);
+
+    // Send success response
+    sendCalendarResponse(res, calendarData);
   } catch (error) {
     sendErrorResponse(res, error);
   }

@@ -1,5 +1,8 @@
 import { PrismaClient } from "../../generated/prisma";
-import { ValidatedSearchParams } from "./propertyValidation";
+import {
+  ValidatedSearchParams,
+  ValidatedDetailParams,
+} from "./propertyValidation";
 
 const prisma = new PrismaClient();
 
@@ -111,12 +114,212 @@ export const getAvailableProperties = async (
           },
           peak_season_rates: {
             where: {
+              AND: [
+                { start_date: { lte: checkOutDate } },
+                { end_date: { gte: checkInDate } },
+              ],
+            },
+          },
+        },
+      },
+    },
+  });
+};
+
+export const getPropertyDetail = async (params: ValidatedDetailParams) => {
+  const { propertyId, guestCount, checkInDate, checkOutDate } = params;
+
+  return await prisma.properties.findUnique({
+    where: {
+      id: propertyId,
+    },
+    include: {
+      property_categories: {
+        select: {
+          name: true,
+        },
+      },
+      cities: {
+        select: {
+          name: true,
+          type: true,
+        },
+      },
+      property_pictures: {
+        select: {
+          id: true,
+          file_path: true,
+          is_main: true,
+        },
+        orderBy: [{ is_main: "desc" }, { id: "asc" }],
+      },
+      rooms: {
+        where: {
+          max_guests: {
+            gte: guestCount,
+          },
+          quantity: {
+            gt: 0,
+          },
+        },
+        include: {
+          bookings: {
+            where: {
+              status_id: {
+                not: 1, // 1 = Canceled
+              },
+              check_in: {
+                lt: checkOutDate,
+              },
+              check_out: {
+                gt: checkInDate,
+              },
+            },
+          },
+          room_unavailabilities: {
+            where: {
               start_date: {
-                lte: checkInDate,
+                lt: checkOutDate,
               },
               end_date: {
-                gte: checkOutDate,
+                gt: checkInDate,
               },
+            },
+          },
+          peak_season_rates: {
+            where: {
+              AND: [
+                { start_date: { lte: checkOutDate } },
+                { end_date: { gte: checkInDate } },
+              ],
+            },
+          },
+        },
+      },
+    },
+  });
+};
+
+export const getPropertyForCalendar = async (
+  propertyId: number,
+  year: number,
+  month: number
+) => {
+  // Buat start dan end date untuk month
+  const startDate = new Date(year, month - 1, 1); // month-1 karena JS month 0-indexed
+  const endDate = new Date(year, month, 0, 23, 59, 59); // Last day of month
+
+  return await prisma.properties.findUnique({
+    where: {
+      id: propertyId,
+    },
+    select: {
+      id: true,
+      name: true,
+      rooms: {
+        where: {
+          quantity: {
+            gt: 0,
+          },
+        },
+        include: {
+          bookings: {
+            where: {
+              status_id: {
+                not: 1, // Exclude canceled bookings
+              },
+              OR: [
+                {
+                  check_in: {
+                    gte: startDate,
+                    lte: endDate,
+                  },
+                },
+                {
+                  check_out: {
+                    gte: startDate,
+                    lte: endDate,
+                  },
+                },
+                {
+                  AND: [
+                    {
+                      check_in: {
+                        lte: startDate,
+                      },
+                    },
+                    {
+                      check_out: {
+                        gte: endDate,
+                      },
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+          room_unavailabilities: {
+            where: {
+              OR: [
+                {
+                  start_date: {
+                    gte: startDate,
+                    lte: endDate,
+                  },
+                },
+                {
+                  end_date: {
+                    gte: startDate,
+                    lte: endDate,
+                  },
+                },
+                {
+                  AND: [
+                    {
+                      start_date: {
+                        lte: startDate,
+                      },
+                    },
+                    {
+                      end_date: {
+                        gte: endDate,
+                      },
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+          peak_season_rates: {
+            where: {
+              OR: [
+                {
+                  start_date: {
+                    gte: startDate,
+                    lte: endDate,
+                  },
+                },
+                {
+                  end_date: {
+                    gte: startDate,
+                    lte: endDate,
+                  },
+                },
+                {
+                  AND: [
+                    {
+                      start_date: {
+                        lte: startDate,
+                      },
+                    },
+                    {
+                      end_date: {
+                        gte: endDate,
+                      },
+                    },
+                  ],
+                },
+              ],
             },
           },
         },
