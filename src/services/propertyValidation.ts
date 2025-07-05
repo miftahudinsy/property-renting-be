@@ -44,6 +44,82 @@ export interface ValidatedCalendarParams {
   month: number;
 }
 
+interface CategoryParams {
+  tenant_id?: string;
+}
+
+export interface ValidatedCategoryParams {
+  tenantId?: string;
+}
+
+interface CreatePropertyParams {
+  name?: string;
+  description?: string;
+  location?: string;
+  category_id?: string;
+  city_id?: string;
+}
+
+export interface ValidatedCreatePropertyParams {
+  name: string;
+  description: string;
+  location: string;
+  categoryId?: number;
+  cityId?: number;
+}
+
+interface MyPropertiesParams {
+  page?: string;
+  all?: string;
+}
+
+export interface ValidatedMyPropertiesParams {
+  page: number;
+  all: boolean;
+}
+
+interface OwnedPropertyDetailParams {
+  property_id?: string;
+}
+
+export interface ValidatedOwnedPropertyDetailParams {
+  propertyId: number;
+}
+
+interface UpdatePropertyParams {
+  property_id?: string;
+  name?: string;
+  description?: string;
+  location?: string;
+  category_id?: string;
+  city_id?: string;
+}
+
+export interface ValidatedUpdatePropertyParams {
+  propertyId: number;
+  name?: string;
+  description?: string;
+  location?: string;
+  categoryId?: number;
+  cityId?: number;
+}
+
+interface PropertyEditParams {
+  property_id?: string;
+}
+
+export interface ValidatedPropertyEditParams {
+  propertyId: number;
+}
+
+interface DeletePropertyParams {
+  property_id?: string;
+}
+
+export interface ValidatedDeletePropertyParams {
+  propertyId: number;
+}
+
 export const validateSearchParams = (
   params: SearchParams,
   res: Response
@@ -269,5 +345,857 @@ export const validateCalendarParams = (
     propertyId: parsedPropertyId,
     year: parsedYear,
     month: parsedMonth,
+  };
+};
+
+export const validateCategoryParams = (
+  params: CategoryParams,
+  res: Response
+): ValidatedCategoryParams | null => {
+  const { tenant_id } = params;
+
+  // tenant_id adalah optional untuk get categories
+  let tenantId: string | undefined;
+  if (tenant_id) {
+    // Validasi format UUID jika ada
+    const uuidRegex =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(tenant_id)) {
+      res.status(400).json({
+        success: false,
+        message: "Format tenant_id tidak valid",
+      });
+      return null;
+    }
+    tenantId = tenant_id;
+  }
+
+  return {
+    tenantId,
+  };
+};
+
+interface CreateCategoryParams {
+  name?: string;
+  tenant_id?: string;
+}
+
+export interface ValidatedCreateCategoryParams {
+  name: string;
+  tenantId: string;
+}
+
+export const validateCreateCategoryParams = (
+  body: CreateCategoryParams,
+  res: Response
+): ValidatedCreateCategoryParams | null => {
+  const { name, tenant_id } = body;
+
+  // Validasi input wajib
+  if (!name || !tenant_id) {
+    res.status(400).json({
+      success: false,
+      message: "name dan tenant_id harus diisi",
+    });
+    return null;
+  }
+
+  // Validasi nama kategori
+  if (name.trim().length < 2 || name.trim().length > 50) {
+    res.status(400).json({
+      success: false,
+      message: "Nama kategori harus antara 2-50 karakter",
+    });
+    return null;
+  }
+
+  // Validasi format UUID untuk tenant_id
+  const uuidRegex =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  if (!uuidRegex.test(tenant_id)) {
+    res.status(400).json({
+      success: false,
+      message: "Format tenant_id tidak valid",
+    });
+    return null;
+  }
+
+  return {
+    name: name.trim(),
+    tenantId: tenant_id,
+  };
+};
+
+interface UpdateCategoryParams {
+  category_id?: string;
+  name?: string;
+}
+
+export interface ValidatedUpdateCategoryParams {
+  categoryId: number;
+  name?: string;
+}
+
+export const validateUpdateCategoryParams = (
+  params: UpdateCategoryParams,
+  body: UpdateCategoryParams,
+  res: Response
+): ValidatedUpdateCategoryParams | null => {
+  // Ambil category_id dari params URL
+  const { category_id } = params;
+
+  // Validasi category_id wajib
+  if (!category_id) {
+    res.status(400).json({
+      success: false,
+      message: "Category ID harus diisi",
+    });
+    return null;
+  }
+
+  const categoryId = parseInt(category_id);
+
+  // Validasi category_id format angka
+  if (isNaN(categoryId) || categoryId <= 0) {
+    res.status(400).json({
+      success: false,
+      message: "Category ID harus berupa angka positif",
+    });
+    return null;
+  }
+
+  // Ambil data yang akan diupdate dari body
+  const { name } = body;
+
+  // Minimal harus ada satu field yang akan diupdate
+  if (!name) {
+    res.status(400).json({
+      success: false,
+      message: "Nama kategori harus diisi untuk update",
+    });
+    return null;
+  }
+
+  const result: ValidatedUpdateCategoryParams = {
+    categoryId,
+  };
+
+  // Validasi nama kategori jika ada
+  if (name !== undefined) {
+    if (name.trim().length < 2 || name.trim().length > 50) {
+      res.status(400).json({
+        success: false,
+        message: "Nama kategori harus antara 2-50 karakter",
+      });
+      return null;
+    }
+    result.name = name.trim();
+  }
+
+  return result;
+};
+
+interface DeleteCategoryParams {
+  category_id?: string;
+}
+
+export interface ValidatedDeleteCategoryParams {
+  categoryId: number;
+}
+
+export const validateDeleteCategoryParams = (
+  params: DeleteCategoryParams,
+  res: Response
+): ValidatedDeleteCategoryParams | null => {
+  const { category_id } = params;
+
+  if (!category_id) {
+    res.status(400).json({
+      success: false,
+      message: "Category ID harus diisi",
+    });
+    return null;
+  }
+
+  const categoryId = parseInt(category_id);
+
+  if (isNaN(categoryId) || categoryId <= 0) {
+    res.status(400).json({
+      success: false,
+      message: "Category ID harus berupa angka positif",
+    });
+    return null;
+  }
+
+  return {
+    categoryId,
+  };
+};
+
+export const validateCreatePropertyParams = (
+  body: CreatePropertyParams,
+  res: Response
+): ValidatedCreatePropertyParams | null => {
+  const { name, description, location, category_id, city_id } = body;
+
+  // Validasi field wajib
+  if (!name || !description || !location) {
+    res.status(400).json({
+      success: false,
+      message: "name, description, dan location harus diisi",
+    });
+    return null;
+  }
+
+  // Validasi panjang string
+  if (name.trim().length < 3) {
+    res.status(400).json({
+      success: false,
+      message: "Nama property minimal 3 karakter",
+    });
+    return null;
+  }
+
+  if (description.trim().length < 10) {
+    res.status(400).json({
+      success: false,
+      message: "Deskripsi property minimal 10 karakter",
+    });
+    return null;
+  }
+
+  if (location.trim().length < 3) {
+    res.status(400).json({
+      success: false,
+      message: "Lokasi property minimal 3 karakter",
+    });
+    return null;
+  }
+
+  // Validasi category_id jika ada
+  let categoryId: number | undefined;
+  if (category_id) {
+    categoryId = parseInt(category_id);
+    if (isNaN(categoryId) || categoryId <= 0) {
+      res.status(400).json({
+        success: false,
+        message: "category_id harus berupa angka yang valid",
+      });
+      return null;
+    }
+  }
+
+  // Validasi city_id jika ada
+  let cityId: number | undefined;
+  if (city_id) {
+    cityId = parseInt(city_id);
+    if (isNaN(cityId) || cityId <= 0) {
+      res.status(400).json({
+        success: false,
+        message: "city_id harus berupa angka yang valid",
+      });
+      return null;
+    }
+  }
+
+  return {
+    name: name.trim(),
+    description: description.trim(),
+    location: location.trim(),
+    categoryId,
+    cityId,
+  };
+};
+
+export const validateMyPropertiesParams = (
+  query: MyPropertiesParams,
+  res: Response
+): ValidatedMyPropertiesParams | null => {
+  const { page, all } = query;
+
+  // Cek apakah parameter all=true
+  const allFlag = typeof all === "string" && all.toLowerCase() === "true";
+
+  // Jika all=true, abaikan pagination
+  if (allFlag) {
+    return {
+      page: 1,
+      all: true,
+    };
+  }
+
+  // Validasi page parameter
+  let pageNumber = 1;
+  if (page) {
+    pageNumber = parseInt(page);
+    if (isNaN(pageNumber) || pageNumber < 1) {
+      res.status(400).json({
+        success: false,
+        message:
+          "Parameter page harus berupa angka yang valid dan lebih besar dari 0",
+      });
+      return null;
+    }
+  }
+
+  return {
+    page: pageNumber,
+    all: false,
+  };
+};
+
+export const validateOwnedPropertyDetailParams = (
+  params: OwnedPropertyDetailParams,
+  res: Response
+): ValidatedOwnedPropertyDetailParams | null => {
+  const { property_id } = params;
+
+  // Validasi property_id wajib
+  if (!property_id) {
+    res.status(400).json({
+      success: false,
+      message: "property_id harus diisi",
+    });
+    return null;
+  }
+
+  const propertyId = parseInt(property_id);
+
+  // Validasi property_id format angka
+  if (isNaN(propertyId) || propertyId <= 0) {
+    res.status(400).json({
+      success: false,
+      message: "property_id harus berupa angka yang valid",
+    });
+    return null;
+  }
+
+  return {
+    propertyId,
+  };
+};
+
+export const validateUpdatePropertyParams = (
+  params: UpdatePropertyParams,
+  body: UpdatePropertyParams,
+  res: Response
+): ValidatedUpdatePropertyParams | null => {
+  // Ambil property_id dari params URL
+  const { property_id } = params;
+
+  // Validasi property_id wajib
+  if (!property_id) {
+    res.status(400).json({
+      success: false,
+      message: "property_id harus diisi",
+    });
+    return null;
+  }
+
+  const propertyId = parseInt(property_id);
+
+  // Validasi property_id format angka
+  if (isNaN(propertyId) || propertyId <= 0) {
+    res.status(400).json({
+      success: false,
+      message: "property_id harus berupa angka yang valid",
+    });
+    return null;
+  }
+
+  // Ambil data yang akan diupdate dari body
+  const { name, description, location, category_id, city_id } = body;
+
+  // Minimal harus ada satu field yang akan diupdate
+  if (!name && !description && !location && !category_id && !city_id) {
+    res.status(400).json({
+      success: false,
+      message: "Minimal satu field harus diisi untuk update",
+    });
+    return null;
+  }
+
+  const result: ValidatedUpdatePropertyParams = {
+    propertyId,
+  };
+
+  // Validasi field yang akan diupdate jika ada
+  if (name !== undefined) {
+    if (name.trim().length < 3) {
+      res.status(400).json({
+        success: false,
+        message: "Nama property minimal 3 karakter",
+      });
+      return null;
+    }
+    result.name = name.trim();
+  }
+
+  if (description !== undefined) {
+    if (description.trim().length < 10) {
+      res.status(400).json({
+        success: false,
+        message: "Deskripsi property minimal 10 karakter",
+      });
+      return null;
+    }
+    result.description = description.trim();
+  }
+
+  if (location !== undefined) {
+    if (location.trim().length < 3) {
+      res.status(400).json({
+        success: false,
+        message: "Lokasi property minimal 3 karakter",
+      });
+      return null;
+    }
+    result.location = location.trim();
+  }
+
+  // Validasi category_id jika ada
+  if (category_id !== undefined) {
+    const categoryId = parseInt(category_id);
+    if (isNaN(categoryId) || categoryId <= 0) {
+      res.status(400).json({
+        success: false,
+        message: "category_id harus berupa angka yang valid",
+      });
+      return null;
+    }
+    result.categoryId = categoryId;
+  }
+
+  // Validasi city_id jika ada
+  if (city_id !== undefined) {
+    const cityId = parseInt(city_id);
+    if (isNaN(cityId) || cityId <= 0) {
+      res.status(400).json({
+        success: false,
+        message: "city_id harus berupa angka yang valid",
+      });
+      return null;
+    }
+    result.cityId = cityId;
+  }
+
+  return result;
+};
+
+export const validatePropertyEditParams = (
+  params: PropertyEditParams,
+  res: Response
+): ValidatedPropertyEditParams | null => {
+  const { property_id } = params;
+
+  if (!property_id) {
+    res.status(400).json({
+      success: false,
+      message: "Property ID harus diisi",
+    });
+    return null;
+  }
+
+  const propertyId = parseInt(property_id);
+
+  if (isNaN(propertyId) || propertyId <= 0) {
+    res.status(400).json({
+      success: false,
+      message: "Property ID harus berupa angka positif",
+    });
+    return null;
+  }
+
+  return {
+    propertyId,
+  };
+};
+
+interface DeletePropertyParams {
+  property_id?: string;
+}
+
+export interface ValidatedDeletePropertyParams {
+  propertyId: number;
+}
+
+export const validateDeletePropertyParams = (
+  params: DeletePropertyParams,
+  res: Response
+): ValidatedDeletePropertyParams | null => {
+  const { property_id } = params;
+
+  if (!property_id) {
+    res.status(400).json({
+      success: false,
+      message: "Property ID harus diisi",
+    });
+    return null;
+  }
+
+  const propertyId = parseInt(property_id);
+
+  if (isNaN(propertyId) || propertyId <= 0) {
+    res.status(400).json({
+      success: false,
+      message: "Property ID harus berupa angka positif",
+    });
+    return null;
+  }
+
+  return {
+    propertyId,
+  };
+};
+
+interface CreateRoomParams {
+  name?: string;
+  description?: string;
+  price?: string;
+  max_guests?: string;
+  quantity?: string;
+  property_id?: string;
+}
+
+export interface ValidatedCreateRoomParams {
+  name: string;
+  description: string;
+  price: number;
+  maxGuests: number;
+  quantity: number;
+  propertyId: number;
+}
+
+export const validateCreateRoomParams = (
+  body: CreateRoomParams,
+  res: Response
+): ValidatedCreateRoomParams | null => {
+  const { name, description, price, max_guests, quantity, property_id } = body;
+
+  // Validasi input wajib
+  if (!name || !description || !price || !max_guests || !property_id) {
+    res.status(400).json({
+      success: false,
+      message:
+        "name, description, price, max_guests, dan property_id harus diisi",
+    });
+    return null;
+  }
+
+  // Validasi nama room
+  if (name.trim().length < 2 || name.trim().length > 100) {
+    res.status(400).json({
+      success: false,
+      message: "Nama room harus antara 2-100 karakter",
+    });
+    return null;
+  }
+
+  // Validasi deskripsi
+  if (description.trim().length < 10 || description.trim().length > 1000) {
+    res.status(400).json({
+      success: false,
+      message: "Deskripsi harus antara 10-1000 karakter",
+    });
+    return null;
+  }
+
+  // Validasi harga
+  const priceNumber = parseInt(price);
+  if (isNaN(priceNumber) || priceNumber <= 0) {
+    res.status(400).json({
+      success: false,
+      message: "Harga harus berupa angka positif",
+    });
+    return null;
+  }
+
+  // Validasi max guests
+  const maxGuestsNumber = parseInt(max_guests);
+  if (isNaN(maxGuestsNumber) || maxGuestsNumber <= 0 || maxGuestsNumber > 50) {
+    res.status(400).json({
+      success: false,
+      message: "Jumlah maksimal tamu harus antara 1-50",
+    });
+    return null;
+  }
+
+  // Validasi quantity (default 1 jika tidak diisi)
+  const quantityNumber = quantity ? parseInt(quantity) : 1;
+  if (isNaN(quantityNumber) || quantityNumber <= 0 || quantityNumber > 100) {
+    res.status(400).json({
+      success: false,
+      message: "Jumlah room harus antara 1-100",
+    });
+    return null;
+  }
+
+  // Validasi property_id
+  const propertyIdNumber = parseInt(property_id);
+  if (isNaN(propertyIdNumber) || propertyIdNumber <= 0) {
+    res.status(400).json({
+      success: false,
+      message: "Property ID harus berupa angka positif",
+    });
+    return null;
+  }
+
+  return {
+    name: name.trim(),
+    description: description.trim(),
+    price: priceNumber,
+    maxGuests: maxGuestsNumber,
+    quantity: quantityNumber,
+    propertyId: propertyIdNumber,
+  };
+};
+
+interface OwnedRoomsParams {
+  page?: string;
+  property_id?: string;
+}
+
+export interface ValidatedOwnedRoomsParams {
+  page: number;
+  propertyId?: number;
+}
+
+export const validateOwnedRoomsParams = (
+  query: OwnedRoomsParams,
+  res: Response
+): ValidatedOwnedRoomsParams | null => {
+  const { page, property_id } = query;
+
+  // Validasi page number
+  const pageNumber = parseInt(page as string) || 1;
+  if (pageNumber < 1) {
+    res.status(400).json({
+      success: false,
+      message: "Page number harus lebih besar dari 0",
+    });
+    return null;
+  }
+
+  // Validasi property_id jika ada
+  let propertyId: number | undefined;
+  if (property_id) {
+    propertyId = parseInt(property_id);
+    if (isNaN(propertyId) || propertyId <= 0) {
+      res.status(400).json({
+        success: false,
+        message: "Property ID harus berupa angka positif",
+      });
+      return null;
+    }
+  }
+
+  return {
+    page: pageNumber,
+    propertyId,
+  };
+};
+
+interface RoomEditParams {
+  room_id?: string;
+}
+
+export interface ValidatedRoomEditParams {
+  roomId: number;
+}
+
+export const validateRoomEditParams = (
+  params: RoomEditParams,
+  res: Response
+): ValidatedRoomEditParams | null => {
+  const { room_id } = params;
+
+  if (!room_id) {
+    res.status(400).json({
+      success: false,
+      message: "Room ID harus diisi",
+    });
+    return null;
+  }
+
+  const roomId = parseInt(room_id);
+
+  if (isNaN(roomId) || roomId <= 0) {
+    res.status(400).json({
+      success: false,
+      message: "Room ID harus berupa angka positif",
+    });
+    return null;
+  }
+
+  return {
+    roomId,
+  };
+};
+
+interface UpdateRoomParams {
+  room_id?: string;
+  name?: string;
+  description?: string;
+  price?: string;
+  max_guests?: string;
+  quantity?: string;
+}
+
+export interface ValidatedUpdateRoomParams {
+  roomId: number;
+  name?: string;
+  description?: string;
+  price?: number;
+  maxGuests?: number;
+  quantity?: number;
+}
+
+export const validateUpdateRoomParams = (
+  params: UpdateRoomParams,
+  body: UpdateRoomParams,
+  res: Response
+): ValidatedUpdateRoomParams | null => {
+  // Ambil room_id dari params URL
+  const { room_id } = params;
+
+  // Validasi room_id wajib
+  if (!room_id) {
+    res.status(400).json({
+      success: false,
+      message: "Room ID harus diisi",
+    });
+    return null;
+  }
+
+  const roomId = parseInt(room_id);
+
+  // Validasi room_id format angka
+  if (isNaN(roomId) || roomId <= 0) {
+    res.status(400).json({
+      success: false,
+      message: "Room ID harus berupa angka positif",
+    });
+    return null;
+  }
+
+  // Ambil data yang akan diupdate dari body
+  const { name, description, price, max_guests, quantity } = body;
+
+  // Minimal harus ada satu field yang akan diupdate
+  if (!name && !description && !price && !max_guests && !quantity) {
+    res.status(400).json({
+      success: false,
+      message: "Minimal satu field harus diisi untuk update",
+    });
+    return null;
+  }
+
+  const result: ValidatedUpdateRoomParams = {
+    roomId,
+  };
+
+  // Validasi field yang akan diupdate jika ada
+  if (name !== undefined) {
+    if (name.trim().length < 2 || name.trim().length > 100) {
+      res.status(400).json({
+        success: false,
+        message: "Nama room harus antara 2-100 karakter",
+      });
+      return null;
+    }
+    result.name = name.trim();
+  }
+
+  if (description !== undefined) {
+    if (description.trim().length < 10 || description.trim().length > 1000) {
+      res.status(400).json({
+        success: false,
+        message: "Deskripsi harus antara 10-1000 karakter",
+      });
+      return null;
+    }
+    result.description = description.trim();
+  }
+
+  // Validasi price jika ada
+  if (price !== undefined) {
+    const priceNumber = parseInt(price);
+    if (isNaN(priceNumber) || priceNumber <= 0) {
+      res.status(400).json({
+        success: false,
+        message: "Harga harus berupa angka positif",
+      });
+      return null;
+    }
+    result.price = priceNumber;
+  }
+
+  // Validasi max_guests jika ada
+  if (max_guests !== undefined) {
+    const maxGuestsNumber = parseInt(max_guests);
+    if (
+      isNaN(maxGuestsNumber) ||
+      maxGuestsNumber <= 0 ||
+      maxGuestsNumber > 50
+    ) {
+      res.status(400).json({
+        success: false,
+        message: "Jumlah maksimal tamu harus antara 1-50",
+      });
+      return null;
+    }
+    result.maxGuests = maxGuestsNumber;
+  }
+
+  // Validasi quantity jika ada
+  if (quantity !== undefined) {
+    const quantityNumber = parseInt(quantity);
+    if (isNaN(quantityNumber) || quantityNumber <= 0 || quantityNumber > 100) {
+      res.status(400).json({
+        success: false,
+        message: "Jumlah room harus antara 1-100",
+      });
+      return null;
+    }
+    result.quantity = quantityNumber;
+  }
+
+  return result;
+};
+
+interface DeleteRoomParams {
+  room_id?: string;
+}
+
+export interface ValidatedDeleteRoomParams {
+  roomId: number;
+}
+
+export const validateDeleteRoomParams = (
+  params: DeleteRoomParams,
+  res: Response
+): ValidatedDeleteRoomParams | null => {
+  const { room_id } = params;
+
+  if (!room_id) {
+    res.status(400).json({
+      success: false,
+      message: "Room ID harus diisi",
+    });
+    return null;
+  }
+
+  const roomId = parseInt(room_id);
+
+  if (isNaN(roomId) || roomId <= 0) {
+    res.status(400).json({
+      success: false,
+      message: "Room ID harus berupa angka positif",
+    });
+    return null;
+  }
+
+  return {
+    roomId,
   };
 };

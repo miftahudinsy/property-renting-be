@@ -2,6 +2,19 @@ import { PrismaClient } from "../../generated/prisma";
 import {
   ValidatedSearchParams,
   ValidatedDetailParams,
+  ValidatedCategoryParams,
+  ValidatedCreateCategoryParams,
+  ValidatedUpdateCategoryParams,
+  ValidatedDeleteCategoryParams,
+  ValidatedCreatePropertyParams,
+  ValidatedMyPropertiesParams,
+  ValidatedOwnedPropertyDetailParams,
+  ValidatedUpdatePropertyParams,
+  ValidatedPropertyEditParams,
+  ValidatedCreateRoomParams,
+  ValidatedOwnedRoomsParams,
+  ValidatedRoomEditParams,
+  ValidatedUpdateRoomParams,
 } from "./propertyValidation";
 
 const prisma = new PrismaClient();
@@ -326,4 +339,869 @@ export const getPropertyForCalendar = async (
       },
     },
   });
+};
+
+export const getPropertyCategories = async (
+  params: ValidatedCategoryParams
+) => {
+  const { tenantId } = params;
+
+  const whereClause: any = {};
+
+  // Jika tenant_id disediakan, filter berdasarkan tenant_id
+  // Jika tidak, ambil kategori publik (tenant_id null) dan kategori milik tenant
+  if (tenantId) {
+    whereClause.OR = [{ tenant_id: null }, { tenant_id: tenantId }];
+  } else {
+    whereClause.tenant_id = null; // Hanya kategori publik
+  }
+
+  return await prisma.property_categories.findMany({
+    where: whereClause,
+    select: {
+      id: true,
+      name: true,
+      tenant_id: true,
+    },
+    orderBy: [
+      { tenant_id: "asc" }, // Public categories (null) first
+      { id: "asc" }, // Then sort by name
+    ],
+  });
+};
+
+export const createCategory = async (params: ValidatedCreateCategoryParams) => {
+  const { name, tenantId } = params;
+
+  // Cek apakah kategori dengan nama yang sama sudah ada untuk tenant ini
+  const existingCategory = await prisma.property_categories.findFirst({
+    where: {
+      name: {
+        equals: name,
+        mode: "insensitive",
+      },
+      tenant_id: tenantId,
+    },
+  });
+
+  if (existingCategory) {
+    return null; // Kategori sudah ada
+  }
+
+  // Buat kategori baru
+  const newCategory = await prisma.property_categories.create({
+    data: {
+      name,
+      tenant_id: tenantId,
+    },
+  });
+
+  return newCategory;
+};
+
+export const updateCategory = async (
+  params: ValidatedUpdateCategoryParams,
+  userId: string
+) => {
+  const { categoryId, name } = params;
+
+  // Pertama, verifikasi bahwa kategori tersebut milik user
+  const category = await prisma.property_categories.findFirst({
+    where: {
+      id: categoryId,
+      tenant_id: userId,
+    },
+  });
+
+  if (!category) {
+    return null;
+  }
+
+  // Cek apakah kategori dengan nama baru sudah ada untuk tenant ini (kecuali kategori yang sedang diupdate)
+  if (name) {
+    const existingCategory = await prisma.property_categories.findFirst({
+      where: {
+        name: {
+          equals: name,
+          mode: "insensitive",
+        },
+        tenant_id: userId,
+        NOT: {
+          id: categoryId,
+        },
+      },
+    });
+
+    if (existingCategory) {
+      return "duplicate"; // Nama sudah digunakan kategori lain
+    }
+  }
+
+  // Buat object untuk data yang akan diupdate
+  const updateData: any = {};
+
+  if (name !== undefined) {
+    updateData.name = name;
+  }
+
+  // Tambahkan updated_at
+  updateData.updated_at = new Date();
+
+  // Update kategori
+  const updatedCategory = await prisma.property_categories.update({
+    where: {
+      id: categoryId,
+    },
+    data: updateData,
+  });
+
+  return updatedCategory;
+};
+
+export const deleteCategory = async (
+  params: ValidatedDeleteCategoryParams,
+  userId: string
+) => {
+  const { categoryId } = params;
+
+  // Pertama, verifikasi bahwa kategori tersebut milik user
+  const category = await prisma.property_categories.findFirst({
+    where: {
+      id: categoryId,
+      tenant_id: userId,
+    },
+  });
+
+  if (!category) {
+    return null;
+  }
+
+  // Cek apakah kategori sedang digunakan oleh property
+  const propertiesUsingCategory = await prisma.properties.count({
+    where: {
+      category_id: categoryId,
+    },
+  });
+
+  if (propertiesUsingCategory > 0) {
+    return "in_use"; // Kategori sedang digunakan
+  }
+
+  // Hapus kategori
+  const deletedCategory = await prisma.property_categories.delete({
+    where: {
+      id: categoryId,
+    },
+  });
+
+  return deletedCategory;
+};
+
+export const getUserProperties = async (
+  userId: string,
+  params: ValidatedMyPropertiesParams
+) => {
+  const { page, all } = params;
+
+  // Jika all=true, ambil semua properties tanpa pagination
+  if (all) {
+    const propertiesAll = await prisma.properties.findMany({
+      where: {
+        tenant_id: userId,
+      },
+      include: {
+        property_categories: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        cities: {
+          select: {
+            id: true,
+            name: true,
+            type: true,
+          },
+        },
+        property_pictures: {
+          select: {
+            id: true,
+            file_path: true,
+            is_main: true,
+          },
+        },
+        rooms: {
+          select: {
+            id: true,
+            name: true,
+            price: true,
+            description: true,
+            max_guests: true,
+            quantity: true,
+            created_at: true,
+            updated_at: true,
+            room_pictures: {
+              select: {
+                id: true,
+                file_path: true,
+              },
+              take: 1,
+            },
+          },
+        },
+        _count: {
+          select: {
+            rooms: true,
+          },
+        },
+      },
+      orderBy: { created_at: "desc" },
+    });
+
+    return {
+      data: propertiesAll,
+      pagination: null,
+    };
+  }
+
+  // Jika tidak all, gunakan pagination standar
+  const limit = 5;
+  const offset = (page - 1) * limit;
+
+  // Query total count untuk pagination
+  const totalCount = await prisma.properties.count({
+    where: {
+      tenant_id: userId,
+    },
+  });
+
+  // Query properties dengan pagination
+  const properties = await prisma.properties.findMany({
+    where: {
+      tenant_id: userId,
+    },
+    include: {
+      property_categories: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+      cities: {
+        select: {
+          id: true,
+          name: true,
+          type: true,
+        },
+      },
+      property_pictures: {
+        select: {
+          id: true,
+          file_path: true,
+          is_main: true,
+        },
+      },
+      rooms: {
+        select: {
+          id: true,
+          name: true,
+          price: true,
+          description: true,
+          max_guests: true,
+          quantity: true,
+          created_at: true,
+          updated_at: true,
+          room_pictures: {
+            select: {
+              id: true,
+              file_path: true,
+            },
+            take: 1,
+          },
+        },
+      },
+      _count: {
+        select: {
+          rooms: true,
+        },
+      },
+    },
+    orderBy: { created_at: "desc" },
+    skip: offset,
+    take: limit,
+  });
+
+  // Calculate pagination info
+  const totalPages = Math.ceil(totalCount / limit);
+  const hasNextPage = page < totalPages;
+  const hasPreviousPage = page > 1;
+
+  return {
+    data: properties,
+    pagination: {
+      current_page: page,
+      total_pages: totalPages,
+      total_items: totalCount,
+      items_per_page: limit,
+      has_next_page: hasNextPage,
+      has_previous_page: hasPreviousPage,
+    },
+  };
+};
+
+export const createProperty = async (
+  params: ValidatedCreatePropertyParams,
+  tenantId: string
+) => {
+  const { name, description, location, categoryId, cityId } = params;
+
+  return await prisma.properties.create({
+    data: {
+      tenant_id: tenantId,
+      name,
+      description,
+      location,
+      category_id: categoryId || null,
+      city_id: cityId || null,
+    },
+    include: {
+      property_categories: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+      cities: {
+        select: {
+          id: true,
+          name: true,
+          type: true,
+        },
+      },
+      property_pictures: {
+        select: {
+          id: true,
+          file_path: true,
+          is_main: true,
+        },
+      },
+      rooms: {
+        select: {
+          id: true,
+          name: true,
+          price: true,
+          description: true,
+          max_guests: true,
+          quantity: true,
+          created_at: true,
+          updated_at: true,
+          room_pictures: {
+            select: {
+              id: true,
+              file_path: true,
+            },
+            take: 1,
+          },
+        },
+      },
+      _count: {
+        select: {
+          rooms: true,
+        },
+      },
+    },
+  });
+};
+
+export const getOwnedPropertyDetail = async (
+  propertyId: number,
+  userId: string
+) => {
+  return await prisma.properties.findFirst({
+    where: {
+      id: propertyId,
+      tenant_id: userId,
+    },
+    include: {
+      property_categories: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+      cities: {
+        select: {
+          id: true,
+          name: true,
+          type: true,
+        },
+      },
+      property_pictures: {
+        select: {
+          id: true,
+          file_path: true,
+          is_main: true,
+        },
+        orderBy: [{ is_main: "desc" }, { id: "asc" }],
+      },
+      rooms: {
+        select: {
+          id: true,
+          name: true,
+          price: true,
+          description: true,
+          max_guests: true,
+          quantity: true,
+          created_at: true,
+          updated_at: true,
+          room_pictures: {
+            select: {
+              id: true,
+              file_path: true,
+            },
+            take: 1,
+          },
+        },
+        orderBy: { id: "asc" },
+      },
+      _count: {
+        select: {
+          rooms: true,
+        },
+      },
+    },
+  });
+};
+
+export const updateProperty = async (
+  params: ValidatedUpdatePropertyParams,
+  tenantId: string
+) => {
+  const { propertyId, name, description, location, categoryId, cityId } =
+    params;
+
+  // Buat object untuk data yang akan diupdate
+  const updateData: any = {};
+
+  if (name !== undefined) {
+    updateData.name = name;
+  }
+
+  if (description !== undefined) {
+    updateData.description = description;
+  }
+
+  if (location !== undefined) {
+    updateData.location = location;
+  }
+
+  if (categoryId !== undefined) {
+    updateData.category_id = categoryId;
+  }
+
+  if (cityId !== undefined) {
+    updateData.city_id = cityId;
+  }
+
+  // Tambahkan updated_at
+  updateData.updated_at = new Date();
+
+  return await prisma.properties.update({
+    where: {
+      id: propertyId,
+      tenant_id: tenantId, // Pastikan property milik user yang bersangkutan
+    },
+    data: updateData,
+    include: {
+      property_categories: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+      cities: {
+        select: {
+          id: true,
+          name: true,
+          type: true,
+        },
+      },
+      property_pictures: {
+        select: {
+          id: true,
+          file_path: true,
+          is_main: true,
+        },
+        orderBy: [{ is_main: "desc" }, { id: "asc" }],
+      },
+      rooms: {
+        select: {
+          id: true,
+          name: true,
+          price: true,
+          description: true,
+          max_guests: true,
+          quantity: true,
+          created_at: true,
+          updated_at: true,
+          room_pictures: {
+            select: {
+              id: true,
+              file_path: true,
+            },
+            take: 1,
+          },
+        },
+        orderBy: { id: "asc" },
+      },
+      _count: {
+        select: {
+          rooms: true,
+        },
+      },
+    },
+  });
+};
+
+export const getPropertyForEdit = async (
+  params: ValidatedPropertyEditParams,
+  userId: string
+) => {
+  const { propertyId } = params;
+
+  return await prisma.properties.findFirst({
+    where: {
+      id: propertyId,
+      tenant_id: userId,
+    },
+    include: {
+      property_categories: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+      cities: {
+        select: {
+          id: true,
+          name: true,
+          type: true,
+        },
+      },
+    },
+  });
+};
+
+export const createRoom = async (
+  params: ValidatedCreateRoomParams,
+  userId: string
+) => {
+  const { name, description, price, maxGuests, quantity, propertyId } = params;
+
+  // Pertama, verifikasi bahwa property tersebut milik user
+  const property = await prisma.properties.findFirst({
+    where: {
+      id: propertyId,
+      tenant_id: userId,
+    },
+  });
+
+  if (!property) {
+    return null;
+  }
+
+  // Buat room baru
+  const newRoom = await prisma.rooms.create({
+    data: {
+      name,
+      description,
+      price,
+      max_guests: maxGuests,
+      quantity,
+      property_id: propertyId,
+    },
+  });
+
+  return newRoom;
+};
+
+export const getOwnedRooms = async (
+  params: ValidatedOwnedRoomsParams,
+  userId: string
+) => {
+  const { page, propertyId } = params;
+  const limit = 5;
+  const offset = (page - 1) * limit;
+
+  // Build where clause
+  const whereClause: any = {
+    properties: {
+      tenant_id: userId,
+    },
+  };
+
+  // Filter by property ID if provided
+  if (propertyId) {
+    whereClause.property_id = propertyId;
+  }
+
+  // Get total count
+  const totalCount = await prisma.rooms.count({
+    where: whereClause,
+  });
+
+  // Get rooms with pagination
+  const rooms = await prisma.rooms.findMany({
+    where: whereClause,
+    select: {
+      id: true,
+      name: true,
+      price: true,
+      max_guests: true,
+      quantity: true,
+      created_at: true,
+      updated_at: true,
+      property_id: true,
+      properties: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+    },
+    orderBy: { created_at: "desc" },
+    skip: offset,
+    take: limit,
+  });
+
+  // Calculate pagination info
+  const totalPages = Math.ceil(totalCount / limit);
+  const hasNextPage = page < totalPages;
+  const hasPreviousPage = page > 1;
+
+  return {
+    data: rooms,
+    pagination: {
+      current_page: page,
+      total_pages: totalPages,
+      total_items: totalCount,
+      items_per_page: limit,
+      has_next_page: hasNextPage,
+      has_previous_page: hasPreviousPage,
+    },
+  };
+};
+
+export const getRoomForEdit = async (
+  params: ValidatedRoomEditParams,
+  userId: string
+) => {
+  const { roomId } = params;
+
+  return await prisma.rooms.findFirst({
+    where: {
+      id: roomId,
+      properties: {
+        tenant_id: userId,
+      },
+    },
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      price: true,
+      max_guests: true,
+      quantity: true,
+      property_id: true,
+      created_at: true,
+      updated_at: true,
+      properties: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+    },
+  });
+};
+
+export const updateRoom = async (
+  params: ValidatedUpdateRoomParams,
+  userId: string
+) => {
+  const { roomId, name, description, price, maxGuests, quantity } = params;
+
+  // Pertama, verifikasi bahwa room tersebut milik user (melalui property)
+  const room = await prisma.rooms.findFirst({
+    where: {
+      id: roomId,
+      properties: {
+        tenant_id: userId,
+      },
+    },
+  });
+
+  if (!room) {
+    return null;
+  }
+
+  // Buat object untuk data yang akan diupdate
+  const updateData: any = {};
+
+  if (name !== undefined) {
+    updateData.name = name;
+  }
+
+  if (description !== undefined) {
+    updateData.description = description;
+  }
+
+  if (price !== undefined) {
+    updateData.price = price;
+  }
+
+  if (maxGuests !== undefined) {
+    updateData.max_guests = maxGuests;
+  }
+
+  if (quantity !== undefined) {
+    updateData.quantity = quantity;
+  }
+
+  // Tambahkan updated_at
+  updateData.updated_at = new Date();
+
+  // Update room
+  const updatedRoom = await prisma.rooms.update({
+    where: {
+      id: roomId,
+    },
+    data: updateData,
+  });
+
+  return updatedRoom;
+};
+
+export const deletePropertyById = async (
+  propertyId: number,
+  tenantId: string
+): Promise<{ success: boolean; message: string; data?: any }> => {
+  try {
+    // Verifikasi bahwa property milik tenant
+    const property = await prisma.properties.findFirst({
+      where: {
+        id: propertyId,
+        tenant_id: tenantId,
+      },
+    });
+
+    if (!property) {
+      return {
+        success: false,
+        message: "Property tidak ditemukan atau bukan milik Anda",
+      };
+    }
+
+    // Cek apakah property memiliki booking yang masih aktif
+    const bookingsCount = await prisma.bookings.count({
+      where: {
+        rooms: {
+          property_id: propertyId,
+        },
+      },
+    });
+
+    if (bookingsCount > 0) {
+      return {
+        success: false,
+        message:
+          "Tidak dapat menghapus property karena masih memiliki booking. Tunggu hingga semua booking selesai",
+      };
+    }
+
+    // Hapus property
+    const deletedProperty = await prisma.properties.delete({
+      where: {
+        id: propertyId,
+      },
+    });
+
+    return {
+      success: true,
+      message: "Property berhasil dihapus",
+      data: deletedProperty,
+    };
+  } catch (error) {
+    console.error("Error deleting property:", error);
+    return {
+      success: false,
+      message: "Terjadi kesalahan saat menghapus property",
+    };
+  }
+};
+
+export const deleteRoomById = async (
+  roomId: number,
+  tenantId: string
+): Promise<{ success: boolean; message: string; data?: any }> => {
+  try {
+    // Verifikasi bahwa room milik tenant melalui property relation
+    const room = await prisma.rooms.findFirst({
+      where: {
+        id: roomId,
+        properties: {
+          tenant_id: tenantId,
+        },
+      },
+      include: {
+        properties: {
+          select: {
+            name: true,
+            tenant_id: true,
+          },
+        },
+      },
+    });
+
+    if (!room) {
+      return {
+        success: false,
+        message: "Room tidak ditemukan atau bukan milik Anda",
+      };
+    }
+
+    // Cek apakah room memiliki booking yang masih aktif
+    const bookingsCount = await prisma.bookings.count({
+      where: {
+        room_id: roomId,
+      },
+    });
+
+    if (bookingsCount > 0) {
+      return {
+        success: false,
+        message:
+          "Tidak dapat menghapus room karena masih memiliki booking. Tunggu hingga semua booking selesai",
+      };
+    }
+
+    // Hapus room
+    const deletedRoom = await prisma.rooms.delete({
+      where: {
+        id: roomId,
+      },
+    });
+
+    return {
+      success: true,
+      message: "Room berhasil dihapus",
+      data: deletedRoom,
+    };
+  } catch (error) {
+    console.error("Error deleting room:", error);
+    return {
+      success: false,
+      message: "Terjadi kesalahan saat menghapus room",
+    };
+  }
 };
