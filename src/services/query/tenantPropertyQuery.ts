@@ -157,12 +157,16 @@ export const getUserProperties = async (
     price: p.rooms.length > 0 ? Math.min(...p.rooms.map((r) => r.price)) : 0,
   }));
 
+  const totalPages = all ? 1 : Math.ceil(totalProperties / limit);
+
   return {
     data: processedProperties,
     pagination: {
       current_page: page,
-      total_pages: all ? 1 : Math.ceil(totalProperties / limit),
+      total_pages: totalPages,
       total_items: totalProperties,
+      has_prev_page: page > 1,
+      has_next_page: page < totalPages,
     },
   };
 };

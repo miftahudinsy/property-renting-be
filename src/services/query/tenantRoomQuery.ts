@@ -80,13 +80,16 @@ export const getOwnedRooms = async (
   });
 
   const totalRooms = await prisma.rooms.count({ where: whereClause });
+  const totalPages = all ? 1 : Math.ceil(totalRooms / limit);
 
   return {
     data: rooms,
     pagination: {
       current_page: page,
-      total_pages: all ? 1 : Math.ceil(totalRooms / limit),
+      total_pages: totalPages,
       total_items: totalRooms,
+      has_prev_page: page > 1,
+      has_next_page: page < totalPages,
     },
   };
 };
