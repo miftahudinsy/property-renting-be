@@ -1,6 +1,11 @@
 import express from "express";
 import cors from "cors";
-import propertyRoutes from "./routes/propertyRoutes";
+import publicPropertyRoutes from "./routes/public/propertyRoutes";
+import tenantPropertyRoutes from "./routes/tenant/propertyRoutes";
+import tenantRoomRoutes from "./routes/tenant/roomRoutes";
+import tenantCategoryRoutes from "./routes/tenant/categoryRoutes";
+import tenantPeakSeasonRoutes from "./routes/tenant/peakSeasonRoutes";
+import tenantRoomUnavailabilityRoutes from "./routes/tenant/roomUnavailabilityRoutes";
 import pictureRoutes from "./routes/pictureRoutes";
 import userRoutes from "./routes/userRoutes";
 
@@ -12,7 +17,12 @@ app.use(cors());
 app.use(express.json());
 
 // Routes
-app.use("/properties", propertyRoutes);
+app.use("/properties", publicPropertyRoutes);
+app.use("/tenant/properties", tenantPropertyRoutes);
+app.use("/tenant/rooms", tenantRoomRoutes);
+app.use("/tenant/categories", tenantCategoryRoutes);
+app.use("/tenant/peak-seasons", tenantPeakSeasonRoutes);
+app.use("/tenant/unavailabilities", tenantRoomUnavailabilityRoutes);
 app.use("/pictures", pictureRoutes);
 app.use("/users", userRoutes);
 

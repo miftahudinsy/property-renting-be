@@ -5,70 +5,59 @@ import {
   validateCreatePeakSeasonParams,
   validateUpdatePeakSeasonParams,
   validateDeletePeakSeasonParams,
-} from "../services/propertyValidation";
+} from "../services/validation/peakSeasonValidation";
 import {
   getPeakSeasonRatesByRoom,
   createPeakSeasonRate,
   updatePeakSeasonRateById,
   deletePeakSeasonRateById,
-} from "../services/propertyQuery";
-import { sendErrorResponse } from "../services/responseHelper";
+} from "../services/query/peakSeasonQuery";
 
-export const getPeakSeasonRates = async (
+export const getPeakSeasonRatesHandler = async (
   req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
   try {
-    const validated = validateListPeakSeasonParams(req.query, res);
-    if (!validated) return;
-    const userId = req.user?.id;
-    if (!userId) {
-      res
-        .status(401)
-        .json({ success: false, message: "User tidak terautentikasi" });
+    const validatedParams = validateListPeakSeasonParams(req.query, res);
+    if (!validatedParams) return;
+
+    const tenantId = req.user?.id;
+    if (!tenantId) {
+      res.status(401).json({ message: "Unauthorized" });
       return;
     }
-    const result = await getPeakSeasonRatesByRoom(validated, userId);
-    if (!result.success) {
-      res.status(404).json({ success: false, message: result.message });
-      return;
-    }
-    res.status(200).json({ success: true, data: result.data });
+
+    const result = await getPeakSeasonRatesByRoom(validatedParams, tenantId);
+    res.status(result.success ? 200 : 404).json(result);
   } catch (error) {
-    sendErrorResponse(res, error);
+    next(error);
   }
 };
 
-export const createPeakSeasonRateEntry = async (
+export const createPeakSeasonRateHandler = async (
   req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
   try {
-    const validated = validateCreatePeakSeasonParams(req.body, res);
-    if (!validated) return;
-    const userId = req.user?.id;
-    if (!userId) {
-      res
-        .status(401)
-        .json({ success: false, message: "User tidak terautentikasi" });
+    const validatedParams = validateCreatePeakSeasonParams(req.body, res);
+    if (!validatedParams) return;
+
+    const tenantId = req.user?.id;
+    if (!tenantId) {
+      res.status(401).json({ message: "Unauthorized" });
       return;
     }
-    const result = await createPeakSeasonRate(validated, userId);
-    if (!result.success) {
-      res.status(400).json({ success: false, message: result.message });
-      return;
-    }
-    res
-      .status(201)
-      .json({ success: true, message: result.message, data: result.data });
+
+    const result = await createPeakSeasonRate(validatedParams, tenantId);
+    res.status(result.success ? 201 : 400).json(result);
   } catch (error) {
-    sendErrorResponse(res, error);
+    next(error);
   }
 };
 
-export const updatePeakSeasonRateEntry = async (
+export const updatePeakSeasonRateHandler = async (
   req: Request,
   res: Response,
   next: NextFunction
@@ -80,54 +69,38 @@ export const updatePeakSeasonRateEntry = async (
       res
     );
     if (!validatedParams) return;
-    const userId = req.user?.id;
-    if (!userId) {
-      res
-        .status(401)
-        .json({ success: false, message: "User tidak terautentikasi" });
+
+    const tenantId = req.user?.id;
+    if (!tenantId) {
+      res.status(401).json({ message: "Unauthorized" });
       return;
     }
-    const result = await updatePeakSeasonRateById(
-      validatedParams,
-      validatedParams,
-      userId
-    );
-    if (!result.success) {
-      res.status(400).json({ success: false, message: result.message });
-      return;
-    }
-    res
-      .status(200)
-      .json({ success: true, message: result.message, data: result.data });
+
+    const result = await updatePeakSeasonRateById(validatedParams, tenantId);
+    res.status(result.success ? 200 : 400).json(result);
   } catch (error) {
-    sendErrorResponse(res, error);
+    next(error);
   }
 };
 
-export const deletePeakSeasonRateEntry = async (
+export const deletePeakSeasonRateHandler = async (
   req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
   try {
-    const validated = validateDeletePeakSeasonParams(req.params, res);
-    if (!validated) return;
-    const userId = req.user?.id;
-    if (!userId) {
-      res
-        .status(401)
-        .json({ success: false, message: "User tidak terautentikasi" });
+    const validatedParams = validateDeletePeakSeasonParams(req.params, res);
+    if (!validatedParams) return;
+
+    const tenantId = req.user?.id;
+    if (!tenantId) {
+      res.status(401).json({ message: "Unauthorized" });
       return;
     }
-    const result = await deletePeakSeasonRateById(validated, userId);
-    if (!result.success) {
-      res.status(404).json({ success: false, message: result.message });
-      return;
-    }
-    res
-      .status(200)
-      .json({ success: true, message: result.message, data: result.data });
+
+    const result = await deletePeakSeasonRateById(validatedParams, tenantId);
+    res.status(result.success ? 200 : 404).json(result);
   } catch (error) {
-    sendErrorResponse(res, error);
+    next(error);
   }
 };

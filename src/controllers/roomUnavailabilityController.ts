@@ -1,135 +1,111 @@
 import { NextFunction, Request, Response } from "express";
-// Import untuk memuat module augmentation Express Request interface
 import "../middleware/authMiddleware";
 import {
-  validateListRoomUnavailParams,
+  validateGetUnavailabilitiesParams,
   validateCreateUnavailabilityParams,
   validateDeleteUnavailabilityParams,
-} from "../services/propertyValidation";
+  validateListRoomUnavailParams,
+} from "../services/validation/roomUnavailabilityValidation";
 import {
-  getRoomUnavailabilitiesByRoom,
+  getRoomUnavailabilitiesByProperty,
   createRoomUnavailability,
   deleteRoomUnavailabilityById,
-} from "../services/propertyQuery";
-import { sendErrorResponse } from "../services/responseHelper";
+  getRoomUnavailabilitiesByRoom,
+} from "../services/query/roomUnavailabilityQuery";
 
-export const getRoomUnavailabilities = async (
+export const getUnavailabilitiesHandler = async (
   req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
   try {
-    // Validasi input parameters
+    const validatedParams = validateGetUnavailabilitiesParams(req.query, res);
+    if (!validatedParams) return;
+
+    const tenantId = req.user?.id;
+    if (!tenantId) {
+      res.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    const result = await getRoomUnavailabilitiesByProperty(
+      validatedParams,
+      tenantId
+    );
+    res.status(200).json({ success: true, ...result });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const listRoomUnavailabilitiesHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
     const validatedParams = validateListRoomUnavailParams(req.query, res);
     if (!validatedParams) return;
 
-    const userId = req.user?.id;
-    if (!userId) {
-      res.status(401).json({
-        success: false,
-        message: "User tidak terautentikasi",
-      });
+    const tenantId = req.user?.id;
+    if (!tenantId) {
+      res.status(401).json({ message: "Unauthorized" });
       return;
     }
 
-    // Query room unavailabilities
-    const result = await getRoomUnavailabilitiesByRoom(validatedParams, userId);
-
-    if (!result.success) {
-      res.status(404).json({
-        success: false,
-        message: result.message,
-      });
-      return;
-    }
-
-    res.status(200).json({
-      success: true,
-      data: result.data,
-    });
+    const result = await getRoomUnavailabilitiesByRoom(
+      validatedParams,
+      tenantId
+    );
+    res.status(result.success ? 200 : 404).json(result);
   } catch (error) {
-    sendErrorResponse(res, error);
+    next(error);
   }
 };
 
-export const createRoomUnavailabilityEntry = async (
+export const createUnavailabilityHandler = async (
   req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
   try {
-    // Validasi input parameters
     const validatedParams = validateCreateUnavailabilityParams(req.body, res);
     if (!validatedParams) return;
 
-    const userId = req.user?.id;
-    if (!userId) {
-      res.status(401).json({
-        success: false,
-        message: "User tidak terautentikasi",
-      });
+    const tenantId = req.user?.id;
+    if (!tenantId) {
+      res.status(401).json({ message: "Unauthorized" });
       return;
     }
 
-    // Create room unavailability
-    const result = await createRoomUnavailability(validatedParams, userId);
-
-    if (!result.success) {
-      res.status(400).json({
-        success: false,
-        message: result.message,
-      });
-      return;
-    }
-
-    // Send success response
-    res.status(201).json({
-      success: true,
-      message: result.message,
-      data: result.data,
-    });
+    const result = await createRoomUnavailability(validatedParams, tenantId);
+    res.status(result.success ? 201 : 400).json(result);
   } catch (error) {
-    sendErrorResponse(res, error);
+    next(error);
   }
 };
 
-export const deleteRoomUnavailabilityEntry = async (
+export const deleteUnavailabilityHandler = async (
   req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
   try {
-    // Validasi input parameters
     const validatedParams = validateDeleteUnavailabilityParams(req.params, res);
     if (!validatedParams) return;
 
-    const userId = req.user?.id;
-    if (!userId) {
-      res.status(401).json({
-        success: false,
-        message: "User tidak terautentikasi",
-      });
+    const tenantId = req.user?.id;
+    if (!tenantId) {
+      res.status(401).json({ message: "Unauthorized" });
       return;
     }
 
-    // Delete room unavailability
-    const result = await deleteRoomUnavailabilityById(validatedParams, userId);
-
-    if (!result.success) {
-      res.status(404).json({
-        success: false,
-        message: result.message,
-      });
-      return;
-    }
-
-    // Send success response
-    res.status(200).json({
-      success: true,
-      message: result.message,
-      data: result.data,
-    });
+    const result = await deleteRoomUnavailabilityById(
+      validatedParams,
+      tenantId
+    );
+    res.status(result.success ? 200 : 404).json(result);
   } catch (error) {
-    sendErrorResponse(res, error);
+    next(error);
   }
 };

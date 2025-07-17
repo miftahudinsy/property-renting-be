@@ -118,6 +118,7 @@ export const sendCategoriesSuccessResponse = (
     id: cat.id,
     name: cat.name,
     properties_count: 0, // Bisa ditambahkan query count jika dibutuhkan
+    tenant_id: cat.tenant_id,
   }));
 
   res.status(200).json({
